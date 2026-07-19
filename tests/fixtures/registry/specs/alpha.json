@@ -1,0 +1,21 @@
+{
+  "server": "alpha",
+  "tools": [
+    {
+      "name": "search",
+      "description": "Search alpha data",
+      "read_only": true,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "write_note",
+      "description": "Write an alpha note",
+      "read_only": false
+    }
+  ]
+}

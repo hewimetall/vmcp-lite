@@ -1,0 +1,10 @@
+{
+  "server": "ok",
+  "tools": [
+    {
+      "name": "echo",
+      "description": "Echo input",
+      "read_only": true
+    }
+  ]
+}

@@ -64,6 +64,7 @@ class ToolDefinition(BaseModel):
     name: str
     description: str = ""
     input_schema: Mapping[str, JsonValue] = Field(default_factory=dict)
+    read_only: bool = False
 
     @field_validator("name")
     @classmethod

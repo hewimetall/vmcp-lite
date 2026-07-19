@@ -1,4 +1,19 @@
-"""Upstream registry adapter placeholders.
+"""Driven registry adapters."""
 
-TODO: implement stdio-only registry loading and validation behind domain ports.
-"""
+from vmcp.adapters.driven.registry.loader import (
+    RegistryConfigError,
+    RegistryLoadError,
+    RegistryLoaderSettings,
+    RegistryValidationIssue,
+    SidecarRegistryLoader,
+    StdioUpstreamConfig,
+)
+
+__all__ = [
+    "RegistryConfigError",
+    "RegistryLoadError",
+    "RegistryLoaderSettings",
+    "RegistryValidationIssue",
+    "SidecarRegistryLoader",
+    "StdioUpstreamConfig",
+]

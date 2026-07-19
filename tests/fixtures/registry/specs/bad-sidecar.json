@@ -1,0 +1,14 @@
+{
+  "server": "bad-sidecar",
+  "tools": [
+    {
+      "name": "",
+      "read_only": true
+    },
+    {
+      "name": "kept",
+      "description": "Valid tool beside an invalid sidecar tool",
+      "read_only": false
+    }
+  ]
+}

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
+from vmcp.adapters.driven.registry import SidecarRegistryLoader
 from vmcp.domain.models import (
     GraphQLError,
     GraphQLRequest,
@@ -69,12 +71,17 @@ class CompositionRoot:
 
 def build_composition_root(
     *,
+    config_path: str | Path | None = None,
     registry_loader: RegistryLoader | None = None,
     upstreams: UpstreamPool | None = None,
     schema_engine: SchemaEngine | None = None,
 ) -> CompositionRoot:
     """Build the vmcp-lite composition root from injected ports or stubs."""
-    resolved_registry_loader = registry_loader or EmptyRegistryLoader()
+    resolved_registry_loader = registry_loader or (
+        SidecarRegistryLoader.from_config_file(config_path)
+        if config_path is not None
+        else EmptyRegistryLoader()
+    )
     resolved_upstreams = upstreams or StubUpstreamPool()
     resolved_schema_engine = schema_engine or StubSchemaEngine()
 
@@ -85,8 +92,11 @@ def build_composition_root(
             schema_engine=resolved_schema_engine,
         ),
         configured=all(
-            dependency is not None
-            for dependency in (registry_loader, upstreams, schema_engine)
+            (
+                registry_loader is not None or config_path is not None,
+                upstreams is not None,
+                schema_engine is not None,
+            )
         ),
     )
 
