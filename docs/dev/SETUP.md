@@ -4,6 +4,14 @@ vmcp-lite targets Python 3.14 per ADR-0020 and uses uv for Python
 installation, dependency resolution, virtualenv management, and command
 execution. The Rust/PyO3 extension is built with maturin.
 
+## Install from PyPI
+
+```bash
+pip install vmcp-lite-mcp
+# or
+uv add vmcp-lite-mcp
+```
+
 ## Required tools
 
 - uv 0.11 or newer

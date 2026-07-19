@@ -7,11 +7,15 @@ and delegate GraphQL schema work to a Rust/PyO3 extension module.
 ## Install
 
 ```bash
-uv sync --extra dev
+pip install vmcp-lite-mcp
+# or
+uv add vmcp-lite-mcp
 ```
 
 ## Run
 
 ```bash
 uv run vmcp-lite
+# or
+uvx vmcp-lite-mcp
 ```

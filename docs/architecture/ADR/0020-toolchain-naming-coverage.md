@@ -12,9 +12,9 @@ high test bar used by related projects.
 
 ## Decision
 
-- Distribution name: `vmcp-lite`.
-- Import package: `vmcp`, or `vmcp_lite` if a conflict requires it.
-- CLI entrypoint: `vmcp-lite`.
+- Distribution name: `vmcp-lite-mcp`.
+- Import package: `vmcp`.
+- CLI entrypoints: `vmcp-lite` and `vmcp-lite-mcp`.
 - Do not publish as bare `vmcp` while full Rust vmcp exists.
 - Require Python >=3.14 for v1 and run CI on 3.14.
 - Document rustup stable and maturin.
