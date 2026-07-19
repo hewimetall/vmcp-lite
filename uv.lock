@@ -1111,7 +1111,7 @@ wheels = [
 ]
 
 [[package]]
-name = "vmcp-lite"
+name = "vmcp-lite-mcp"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
