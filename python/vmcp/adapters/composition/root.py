@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
@@ -137,6 +138,13 @@ class CompositionRoot:
 
     async def stop(self) -> None:
         """Stop background bridge work and upstream resources."""
+        if self.schema_engine is not None:
+            close_call_bridge = getattr(self.schema_engine, "close_call_bridge", None)
+            if close_call_bridge is not None:
+                result = close_call_bridge()
+                if inspect.isawaitable(result):
+                    await result
+
         if self.call_bridge is not None:
             self.call_bridge.close()
 

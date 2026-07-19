@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import queue
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -18,21 +20,62 @@ FIXTURES = Path(__file__).parent / "fixtures" / "registry"
 class FakeRustEngine:
     def __init__(self, catalogue_json: str) -> None:
         self.catalogue = json.loads(catalogue_json)
-        self.call_tool = None
+        self.attached = False
+        self.pending: queue.Queue[dict[str, object]] = queue.Queue()
+        self.responses: dict[str, str] = {}
+        self.next_request_id = 1
 
-    def set_tool_caller(self, call_tool) -> None:
-        self.call_tool = call_tool
+    def attach_call_bridge(self) -> None:
+        self.attached = True
+
+    def detach_call_bridge(self) -> None:
+        self.attached = False
+
+    def receive_tool_call(self, timeout_ms: int = 100) -> str | None:
+        try:
+            request = self.pending.get(timeout=timeout_ms / 1000)
+        except queue.Empty:
+            return None
+        return json.dumps(request)
+
+    def respond_tool_call(self, request_id: str, result_json: str) -> bool:
+        self.responses[request_id] = result_json
+        return True
+
+    def fail_tool_call(self, request_id: str, message: str) -> bool:
+        self.responses[request_id] = json.dumps(
+            {"isError": True, "text": message, "json": None}
+        )
+        return True
 
     def execute(self, query: str, variables_json: str | None = None) -> str:
         if "alpha_search" in query:
-            assert self.call_tool is not None
-            payload = json.loads(
-                self.call_tool("alpha", "search", variables_json or "{}", "query")
+            assert self.attached is True
+            request_id = f"fake-{self.next_request_id}"
+            self.next_request_id += 1
+            self.pending.put(
+                {
+                    "request_id": request_id,
+                    "server": "alpha",
+                    "tool": "search",
+                    "arguments": json.loads(variables_json or "{}"),
+                    "operation": "query",
+                }
             )
+            payload = json.loads(_wait_for_fake_response(self, request_id))
             return json.dumps({"data": {"alpha_search": payload}, "errors": []})
 
         _ = variables_json
         return json.dumps({"data": {"toolCount": len(self.catalogue)}, "errors": []})
+
+
+def _wait_for_fake_response(engine: FakeRustEngine, request_id: str) -> str:
+    deadline = time.monotonic() + 1
+    while request_id not in engine.responses:
+        if time.monotonic() > deadline:
+            raise TimeoutError(f"timed out waiting for {request_id}")
+        time.sleep(0.001)
+    return engine.responses.pop(request_id)
 
 
 class FakeToolCaller:
