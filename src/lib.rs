@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use pyo3::exceptions::PyValueError;
+#[cfg(test)]
+use pyo3::ffi::c_str;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 use serde::Serialize;
@@ -12,9 +15,10 @@ use serde_json::{json, Map, Value};
 /// will later provide the async CallBridge. For now, registered tool fields
 /// return a placeholder payload instead of calling upstream MCP servers.
 #[pyclass(name = "SchemaEngine")]
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct SchemaEngine {
     tools: Vec<ToolMetadata>,
+    tool_caller: Option<Arc<Py<PyAny>>>,
 }
 
 #[pymethods]
@@ -46,9 +50,24 @@ impl SchemaEngine {
         self.tools.len()
     }
 
+    fn set_tool_caller(&mut self, call_tool: Py<PyAny>) {
+        self.tool_caller = Some(Arc::new(call_tool));
+    }
+
+    fn clear_tool_caller(&mut self) {
+        self.tool_caller = None;
+    }
+
     #[pyo3(signature = (query, variables_json=None))]
-    fn execute(&self, query: &str, variables_json: Option<&str>) -> PyResult<String> {
-        Ok(self.execute_json(query, variables_json))
+    fn execute(
+        &self,
+        py: Python<'_>,
+        query: &str,
+        variables_json: Option<&str>,
+    ) -> PyResult<String> {
+        let query = query.to_string();
+        let variables_json = variables_json.map(str::to_string);
+        Ok(py.detach(|| self.execute_json(&query, variables_json.as_deref())))
     }
 }
 
@@ -65,6 +84,7 @@ impl SchemaEngine {
             .map_err(|err| PyValueError::new_err(format!("invalid catalogue JSON: {err}")))?;
         Ok(Self {
             tools: parse_tool_catalogue(&value),
+            tool_caller: None,
         })
     }
 
@@ -74,9 +94,10 @@ impl SchemaEngine {
             return graphql_error("GraphQL query must not be blank");
         }
 
-        if let Err(message) = parse_variables(variables_json) {
-            return graphql_error(&message);
-        }
+        let arguments = match parse_variables(variables_json) {
+            Ok(value) => value,
+            Err(message) => return graphql_error(&message),
+        };
 
         let fields = top_level_fields(query);
         if fields.is_empty() {
@@ -84,30 +105,109 @@ impl SchemaEngine {
         }
 
         let mut data = Map::new();
+        let mut tool_jobs = Vec::new();
         for field in fields {
-            match field.as_str() {
+            match field.field_name.as_str() {
                 "__typename" => {
-                    data.insert(field, json!("Query"));
+                    data.insert(field.response_key, json!("Query"));
                 }
                 "servers" => {
-                    data.insert(field, Value::Array(self.server_summaries()));
+                    data.insert(field.response_key, Value::Array(self.server_summaries()));
                 }
                 "search" => {
-                    data.insert(field, Value::Array(self.search_hits()));
+                    data.insert(field.response_key, Value::Array(self.search_hits()));
                 }
                 _ => {
-                    if let Some(tool) = self.tools.iter().find(|tool| tool.field_name == field) {
-                        // TODO(ADR-0010): hand this field off to a tokio worker that awaits the
-                        // Python CallBridge instead of returning a fixed placeholder payload.
-                        data.insert(field, tool.placeholder_result());
+                    if let Some(tool) = self
+                        .tools
+                        .iter()
+                        .find(|tool| tool.field_name == field.field_name)
+                    {
+                        tool_jobs.push(ToolFieldJob {
+                            response_key: field.response_key,
+                            tool: tool.clone(),
+                        });
                     } else {
-                        return graphql_error(&format!("unknown GraphQL field: {field}"));
+                        return graphql_error(&format!(
+                            "unknown GraphQL field: {}",
+                            field.field_name
+                        ));
                     }
                 }
             }
         }
 
+        for (response_key, value) in self.resolve_tool_jobs(tool_jobs, &arguments) {
+            data.insert(response_key, value);
+        }
+
         graphql_success(Value::Object(data))
+    }
+
+    fn resolve_tool_jobs(&self, jobs: Vec<ToolFieldJob>, arguments: &Value) -> Vec<(String, Value)> {
+        if jobs.len() <= 1 {
+            return jobs
+                .into_iter()
+                .map(|job| {
+                    let value = self.resolve_tool_field(&job.tool, arguments);
+                    (job.response_key, value)
+                })
+                .collect();
+        }
+
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = jobs
+                .into_iter()
+                .map(|job| {
+                    scope.spawn(move || {
+                        let value = self.resolve_tool_field(&job.tool, arguments);
+                        (job.response_key, value)
+                    })
+                })
+                .collect();
+
+            handles
+                .into_iter()
+                .map(|handle| {
+                    handle
+                        .join()
+                        .unwrap_or_else(|_| ("".to_string(), tool_error_result("tool resolver panicked")))
+                })
+                .filter(|(response_key, _)| !response_key.is_empty())
+                .collect()
+        })
+    }
+
+    fn resolve_tool_field(&self, tool: &ToolMetadata, arguments: &Value) -> Value {
+        let Some(call_tool) = &self.tool_caller else {
+            return tool.placeholder_result();
+        };
+
+        let arguments_json = serde_json::to_string(arguments)
+            .expect("validated GraphQL variables are serializable as tool arguments");
+        let result_json = Python::attach(|py| -> PyResult<String> {
+            let result = call_tool.bind(py).call1((
+                tool.server.as_str(),
+                tool.name.as_str(),
+                arguments_json.as_str(),
+                if tool.read_only { "query" } else { "mutation" },
+            ))?;
+            if let Ok(text) = result.extract::<String>() {
+                return Ok(text);
+            }
+
+            let json_module = py.import("json")?;
+            json_module
+                .call_method1("dumps", (result,))
+                .and_then(|text| text.extract::<String>())
+        });
+
+        match result_json {
+            Ok(result_json) => serde_json::from_str(&result_json).unwrap_or_else(|err| {
+                tool_error_result(&format!("tool caller returned invalid JSON: {err}"))
+            }),
+            Err(err) => tool_error_result(&format!("tool caller failed: {err}")),
+        }
     }
 
     fn server_summaries(&self) -> Vec<Value> {
@@ -169,6 +269,18 @@ struct ToolMetadata {
     field_name: String,
 }
 
+#[derive(Clone, Debug)]
+struct SelectedField {
+    response_key: String,
+    field_name: String,
+}
+
+#[derive(Clone, Debug)]
+struct ToolFieldJob {
+    response_key: String,
+    tool: ToolMetadata,
+}
+
 impl ToolMetadata {
     fn placeholder_result(&self) -> Value {
         json!({
@@ -180,6 +292,14 @@ impl ToolMetadata {
             "json": null,
         })
     }
+}
+
+fn tool_error_result(message: &str) -> Value {
+    json!({
+        "isError": true,
+        "text": message,
+        "json": null,
+    })
 }
 
 #[derive(Clone, Debug)]
@@ -367,7 +487,7 @@ fn sanitize_graphql_name(value: &str) -> String {
     output
 }
 
-fn top_level_fields(query: &str) -> Vec<String> {
+fn top_level_fields(query: &str) -> Vec<SelectedField> {
     let Some(open_brace) = query.find('{') else {
         return Vec::new();
     };
@@ -427,10 +547,16 @@ fn top_level_fields(query: &str) -> Vec<String> {
                         {
                             index += 1;
                         }
-                        fields.push(query[aliased_start..index].to_string());
+                        fields.push(SelectedField {
+                            response_key: first_name.to_string(),
+                            field_name: query[aliased_start..index].to_string(),
+                        });
                     }
                 } else {
-                    fields.push(first_name.to_string());
+                    fields.push(SelectedField {
+                        response_key: first_name.to_string(),
+                        field_name: first_name.to_string(),
+                    });
                 }
             }
             _ => {
@@ -577,6 +703,103 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("CallBridge is not wired yet"));
+    }
+
+    #[test]
+    fn known_tool_field_uses_registered_python_tool_caller() {
+        let mut engine =
+            SchemaEngine::from_catalogue_json(Some(r#"[{"server": "demo", "name": "echo"}]"#))
+                .unwrap();
+        Python::attach(|py| {
+            let module = PyModule::from_code(
+                py,
+                c_str!(
+                    r#"
+import json
+
+def call_tool(server, tool, arguments_json, operation):
+    return json.dumps({
+        "isError": False,
+        "text": f"{operation}:{server}.{tool}",
+        "json": json.loads(arguments_json),
+    })
+"#
+                ),
+                c_str!("callback.py"),
+                c_str!("callback"),
+            )
+            .unwrap();
+            engine.set_tool_caller(module.getattr("call_tool").unwrap().unbind());
+        });
+
+        let response = decode(
+            &engine.execute_json("{ demo_echo { isError text json } }", Some(r#"{"text":"hi"}"#)),
+        );
+
+        assert_eq!(response["errors"], json!([]));
+        assert_eq!(response["data"]["demo_echo"]["isError"], false);
+        assert_eq!(response["data"]["demo_echo"]["text"], "query:demo.echo");
+        assert_eq!(response["data"]["demo_echo"]["json"]["text"], "hi");
+    }
+
+    #[test]
+    fn aliased_tool_fields_are_resolved_concurrently() {
+        let mut engine =
+            SchemaEngine::from_catalogue_json(Some(r#"[{"server": "demo", "name": "echo"}]"#))
+                .unwrap();
+        let module: Py<PyModule> = Python::attach(|py| {
+            PyModule::from_code(
+                py,
+                c_str!(
+                    r#"
+import json
+import time
+
+active = 0
+max_active = 0
+
+def call_tool(server, tool, arguments_json, operation):
+    global active, max_active
+    active += 1
+    max_active = max(max_active, active)
+    try:
+        time.sleep(0.05)
+        return json.dumps({
+            "isError": False,
+            "text": f"{server}.{tool}",
+            "json": json.loads(arguments_json),
+        })
+    finally:
+        active -= 1
+"#
+                ),
+                c_str!("concurrent_callback.py"),
+                c_str!("concurrent_callback"),
+            )
+            .unwrap()
+            .unbind()
+        });
+        Python::attach(|py| {
+            engine.set_tool_caller(module.bind(py).getattr("call_tool").unwrap().unbind());
+        });
+
+        let response = decode(&engine.execute_json(
+            "{ first: demo_echo { text } second: demo_echo { text } }",
+            Some(r#"{"value":1}"#),
+        ));
+        let max_active: usize = Python::attach(|py| {
+            module
+                .bind(py)
+                .getattr("max_active")
+                .unwrap()
+                .extract()
+                .unwrap()
+        });
+
+        assert_eq!(response["errors"], json!([]));
+        assert_eq!(response["data"]["first"]["isError"], false);
+        assert_eq!(response["data"]["second"]["isError"], false);
+        assert!(max_active > 1);
     }
 
     #[test]

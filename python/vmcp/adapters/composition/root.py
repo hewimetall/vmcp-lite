@@ -7,7 +7,7 @@ from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import Protocol, cast, runtime_checkable
 
 from vmcp.adapters.bridge.call_bridge import BridgeRequest, CallBridge
 from vmcp.adapters.driven.registry import (
@@ -38,6 +38,19 @@ from vmcp.domain.usecases import ExecuteQueryGraphQL, compose_usecases
 
 UpstreamPoolFactory = Callable[[Sequence[PoolStdioUpstreamConfig]], UpstreamPool]
 SchemaEngineBuilder = Callable[[ToolRegistry, Mapping[str, str | None]], SchemaEngine]
+
+
+@runtime_checkable
+class CallBridgeAttachable(Protocol):
+    """Schema adapter extension point for ADR-0011 CallBridge callbacks."""
+
+    def set_call_bridge(
+        self,
+        call_bridge: CallBridge,
+        *,
+        loop: asyncio.AbstractEventLoop | None = None,
+    ) -> None:
+        """Attach the active CallBridge to the schema engine."""
 
 
 class EmptyRegistryLoader:
@@ -208,8 +221,7 @@ async def boot_composition_root(
         await resolved_upstreams.start()
         if enable_call_bridge:
             call_bridge = CallBridge()
-            # The Python serve loop is ready for ADR-0011 callbacks; the current
-            # PyO3 SchemaEngine stub has no tokio-side attachment point yet.
+            _attach_call_bridge(resolved_schema_engine, call_bridge)
             call_bridge_task = asyncio.create_task(
                 call_bridge.serve(UpstreamPoolBridgeCaller(resolved_upstreams))
             )
@@ -292,7 +304,13 @@ def _upstream_descriptions(registry_loader: RegistryLoader) -> dict[str, str | N
     return {upstream.name: upstream.description for upstream in registry_loader.upstreams}
 
 
+def _attach_call_bridge(schema_engine: SchemaEngine, call_bridge: CallBridge) -> None:
+    if isinstance(schema_engine, CallBridgeAttachable):
+        schema_engine.set_call_bridge(call_bridge, loop=asyncio.get_running_loop())
+
+
 __all__ = [
+    "CallBridgeAttachable",
     "CompositionRoot",
     "EmptyRegistryLoader",
     "LoadedRegistryLoader",
