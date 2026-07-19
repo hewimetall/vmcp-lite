@@ -1,0 +1,58 @@
+[build-system]
+requires = ["maturin>=1.8,<2"]
+build-backend = "maturin"
+
+[project]
+name = "vmcp-lite"
+version = "0.1.0"
+description = "stdio-only HEX virtual MCP gateway with a PyO3 GraphQL core"
+requires-python = ">=3.14"
+readme = "README.md"
+dependencies = [
+    "fastmcp>=3.4.4",
+    "pydantic>=2.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "maturin>=1.8,<2",
+    "pytest>=8",
+    "ruff>=0.12",
+]
+
+[project.scripts]
+vmcp-lite = "vmcp.__main__:main"
+
+[tool.maturin]
+features = ["extension-module"]
+python-source = "python"
+module-name = "vmcp._graphql"
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["python", "tests"]
+extend-exclude = ["target", ".venv"]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "SIM",
+    "RUF",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["vmcp"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
