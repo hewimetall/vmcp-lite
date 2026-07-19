@@ -1,4 +1,4 @@
-.PHONY: build test lint
+.PHONY: build test lint demo
 
 build:
 	uv run --extra dev maturin develop
@@ -8,3 +8,6 @@ test:
 
 lint:
 	uv run --extra dev ruff check python tests
+
+demo:
+	uv run vmcp-lite --config "$(CURDIR)/examples/demo/vmcp.toml"

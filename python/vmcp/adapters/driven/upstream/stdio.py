@@ -414,21 +414,25 @@ class StdioMcpClient:
 
     async def _write_message(self, message: Mapping[str, Any]) -> None:
         body = json.dumps(message, separators=(",", ":")).encode("utf-8")
-        header = f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
-        self._stdin.write(header + body)
+        self._stdin.write(body + b"\n")
         try:
             await self._stdin.drain()
         except (BrokenPipeError, ConnectionResetError) as exc:
             raise UpstreamProtocolError("stdio upstream pipe closed while writing") from exc
 
     async def _read_message(self) -> dict[str, Any]:
-        content_length: int | None = None
         while True:
             line = await self._stdout.readline()
             if not line:
                 raise UpstreamProtocolError("stdio upstream closed stdout")
-            if line in (b"\r\n", b"\n"):
+            if line not in (b"\r\n", b"\n"):
                 break
+
+        if not line.lower().startswith(b"content-length:"):
+            return _decode_message_body(line)
+
+        content_length: int | None = None
+        while True:
             key, separator, value = line.decode("ascii", errors="replace").partition(":")
             if not separator:
                 raise UpstreamProtocolError(f"invalid stdio header line: {line!r}")
@@ -437,18 +441,17 @@ class StdioMcpClient:
                     content_length = int(value.strip())
                 except ValueError as exc:
                     raise UpstreamProtocolError("invalid Content-Length header") from exc
+            line = await self._stdout.readline()
+            if not line:
+                raise UpstreamProtocolError("stdio upstream closed stdout")
+            if line in (b"\r\n", b"\n"):
+                break
 
         if content_length is None:
             raise UpstreamProtocolError("missing Content-Length header")
 
         body = await self._stdout.readexactly(content_length)
-        try:
-            message = json.loads(body)
-        except json.JSONDecodeError as exc:
-            raise UpstreamProtocolError("invalid JSON-RPC message body") from exc
-        if not isinstance(message, dict):
-            raise UpstreamProtocolError("JSON-RPC message must be an object")
-        return cast(dict[str, Any], message)
+        return _decode_message_body(body)
 
 
 async def _terminate_process(
@@ -500,3 +503,13 @@ def _extract_error_message(raw_result: Mapping[str, Any]) -> str | None:
             if isinstance(item, Mapping) and isinstance(item.get("text"), str):
                 return cast(str, item["text"])
     return None
+
+
+def _decode_message_body(body: bytes) -> dict[str, Any]:
+    try:
+        message = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise UpstreamProtocolError("invalid JSON-RPC message body") from exc
+    if not isinstance(message, dict):
+        raise UpstreamProtocolError("JSON-RPC message must be an object")
+    return cast(dict[str, Any], message)
