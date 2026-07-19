@@ -1,0 +1,28 @@
+name: mermaid_viewer_theme
+description: |
+  Readable Mermaid theme notes for architect-c4 viewer (classDiagram + C4).
+  Use when diagrams look ugly or unreadable.
+arguments:
+  - name: workspace_id
+    required: false
+    default: "ws-vmcp-lite"
+  - name: layer
+    required: false
+    default: "code"
+  - name: parent_id
+    required: false
+    default: "domain"
+template: |
+  Improve Mermaid visuals for architect-c4 layer={{layer}} parent={{parent_id}}.
+
+  Guidance:
+  - Soft slate lines (#94a3b8); avoid harsh black
+  - classDiagram: light indigo fill, dark text; put +method() in description
+  - Prefer class Alias["Display Name"] over yellow notes
+
+  Verify:
+  architect-c4__get_layer_diagram(
+    workspace_id="{{workspace_id}}",
+    layer="{{layer}}",
+    parent_id="{{parent_id}}"
+  )

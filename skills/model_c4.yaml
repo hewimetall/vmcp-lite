@@ -1,0 +1,27 @@
+name: model_c4
+description: |
+  Model one C4 layer (context|container|component|code) for vmcp-lite via architect-c4.
+arguments:
+  - name: workspace_id
+    required: false
+    default: "ws-vmcp-lite"
+  - name: layer
+    required: false
+    default: "container"
+  - name: parent_id
+    required: false
+    default: "vmcp_lite"
+    description: Parent element for container/component/code drill-down
+template: |
+  # Model C4
+  - workspace: {{workspace_id}}
+  - layer: {{layer}}
+  - parent_id: {{parent_id}}
+
+  kinds: person|software_system|external|container|component|code
+  HEX labels: Domain + Ports | Driving: FastMCP | Adapter: GraphQL | Driven: pool/config
+
+  1. architect-c4__upsert_element / architect-c4__upsert_relationship
+  2. Relationships at code level (atom canon)
+  3. architect-c4__validate_model
+  4. architect-c4__get_layer_diagram(layer="{{layer}}", parent_id="{{parent_id}}")

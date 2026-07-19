@@ -1,0 +1,29 @@
+name: write_flow
+description: |
+  Write a Flow (c4_dynamic | sequence | state) into architect-c4 for ws-vmcp-lite.
+  Use when documenting boot, discovery, aggregation, validation, or TDD paths.
+arguments:
+  - name: workspace_id
+    required: false
+    default: "ws-vmcp-lite"
+  - name: flow_id
+    required: true
+    description: slug id, e.g. parallel-query-fanout
+  - name: title
+    required: true
+  - name: kind
+    required: false
+    default: "c4_dynamic"
+    description: c4_dynamic | sequence | state
+template: |
+  # Write Flow
+  - workspace: {{workspace_id}}
+  - id: {{flow_id}}
+  - title: {{title}}
+  - kind: {{kind}}
+
+  Rules:
+  - c4_dynamic: steps with n, from_id, to_id, label — ids MUST exist as C4 elements.
+  - sequence/state: Mermaid body (sequenceDiagram / stateDiagram-v2).
+  - related_adrs: link ADR-0000 and relevant proposed ADRs.
+  - Call architect-c4__upsert_flow then architect-c4__get_flow_diagram for view_url.

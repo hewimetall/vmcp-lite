@@ -1,0 +1,30 @@
+name: architecture_decision_records
+description: |
+  Write Architecture Decision Records (ADRs) into architect-c4 (git-fixed docs/adr + SQL index).
+  Use when locking a technical decision with context/decision/consequences.
+arguments:
+  - name: workspace_id
+    required: false
+    default: "ws-vmcp-lite"
+  - name: title
+    required: true
+    description: ADR title
+  - name: status
+    required: false
+    default: "proposed"
+    description: Agent may set draft|proposed only
+template: |
+  Document an ADR in architect-c4 for workspace {{workspace_id}}.
+
+  Title: {{title}}
+  Status: {{status}}
+
+  Steps:
+  1. architect-c4__get_model(workspace_id="{{workspace_id}}")
+  2. Draft Context / Decision / Consequences (GFM ok; no raw HTML)
+  3. Scope to a real element id (software_system or container)
+  4. architect-c4__upsert_adr(workspace_id, adr={…, status: "{{status}}"})
+  5. Return view_url from response or architect-c4__list_adrs
+
+  accepted/rejected — only via architect-c4__set_adr_status (process).
+  Bound by ADR-0000 MUST SOLID+DRY+TDD+HEX.

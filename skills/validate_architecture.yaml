@@ -1,0 +1,18 @@
+name: validate_architecture
+description: |
+  Run validate_model on ws-vmcp-lite and fix agent-facing problems
+  (dangling edges, missing parents, ADR scope, policy.forbid).
+arguments:
+  - name: workspace_id
+    required: false
+    default: "ws-vmcp-lite"
+template: |
+  # Validate
+  workspace_id: {{workspace_id}}
+
+  1. architect-c4__validate_model(workspace_id="{{workspace_id}}")
+  2. Fix dangling relationships / parents / ADR scope_element_id
+  3. Honour policy.forbid on accepted ADRs (esp. ADR-0000)
+  4. Note: container/component "disconnected" warnings are expected under atom canon
+     (edges live at code level) — do not invent illegal container→container edges
+  5. architect-c4__get_overview_diagram + architect-c4__get_view_links

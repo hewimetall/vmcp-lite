@@ -1,0 +1,20 @@
+name: wasm_c4_viewer
+description: |
+  Open WASM / All-layers C4 canvas for ws-vmcp-lite.
+arguments:
+  - name: workspace_id
+    required: false
+    default: "ws-vmcp-lite"
+  - name: focus
+    required: false
+    description: Container or system id to focus in mode=all
+template: |
+  Open architect-c4 WASM / All-layers view for {{workspace_id}}.
+
+  URLs:
+  - All layers: https://architecture.runmcp.ru/view/{{workspace_id}}?mode=all
+  - WASM: https://architecture.runmcp.ru/view/{{workspace_id}}?mode=all&renderer=wasm{{#if focus}}&focus={{focus}}{{/if}}
+
+  Tools:
+  1. architect-c4__get_scene(workspace_id="{{workspace_id}}", mode="all"{{#if focus}}, focus="{{focus}}"{{/if}})
+  2. architect-c4__get_view_links(workspace_id="{{workspace_id}}")

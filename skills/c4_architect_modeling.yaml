@@ -1,0 +1,35 @@
+name: c4_architect_modeling
+description: |
+  Model C4 architecture (context/container/component/code) + ADRs via architect-c4.
+  Use when the user asks for C4 diagrams, architecture views, drill-down, or view links.
+  Bound workspace for this repo: ws-vmcp-lite.
+arguments:
+  - name: workspace_id
+    required: false
+    default: "ws-vmcp-lite"
+    description: Existing workspace id; default ws-vmcp-lite
+  - name: goal
+    required: true
+    description: What to model (e.g. harden HEX ports, add flow X)
+template: |
+  You are modeling architecture with **architect-c4** for vmcp-lite.
+
+  RULES:
+  - Call MCP tools on server `architect-c4` (`architect-c4__*`).
+  - Atom canon: relationships only between code/person/software_system/external.
+  - Prefer `architect-c4__get_view_links` for absolute HTTPS viewer URLs.
+  - MUST SOLID+DRY+TDD+HEX (ADR-0000 accepted).
+  - Code level = Mermaid classDiagram members in description (`+method()`).
+
+  Goal: {{goal}}
+  workspace_id: {{workspace_id}}
+
+  Start batch:
+  1. architect-c4__get_view_links(workspace_id="{{workspace_id}}")
+  2. architect-c4__get_model(workspace_id="{{workspace_id}}")
+  3. architect-c4__validate_model(workspace_id="{{workspace_id}}")
+
+  Then upsert person/system/container/component/code + code-level relationships.
+  Return viewer URLs from get_view_links / get_*_diagram.
+
+  References: https://c4model.com/ · https://architecture.runmcp.ru/view/{{workspace_id}}
