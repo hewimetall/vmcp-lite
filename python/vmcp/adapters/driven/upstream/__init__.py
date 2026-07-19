@@ -1,4 +1,41 @@
-"""Stdio upstream adapter placeholders.
+"""Driven adapters for stdio MCP upstreams."""
 
-TODO: manage upstream child process lifecycle through CallBridge-owned ports.
-"""
+from vmcp.adapters.driven.upstream.stdio import (
+    DEFAULT_CALL_TIMEOUT_SECONDS,
+    DEFAULT_SHUTDOWN_TIMEOUT_SECONDS,
+    DEFAULT_SPAWN_TIMEOUT_SECONDS,
+    MCP_PROTOCOL_VERSION,
+    SpawnFailure,
+    StdioClient,
+    StdioMcpClient,
+    StdioProcess,
+    StdioToolCaller,
+    StdioUpstreamConfig,
+    StdioUpstreamPool,
+    StdioUpstreamSession,
+    UpstreamCallError,
+    UpstreamError,
+    UpstreamProtocolError,
+    UpstreamSpawnError,
+    UpstreamUnavailableError,
+)
+
+__all__ = [
+    "DEFAULT_CALL_TIMEOUT_SECONDS",
+    "DEFAULT_SHUTDOWN_TIMEOUT_SECONDS",
+    "DEFAULT_SPAWN_TIMEOUT_SECONDS",
+    "MCP_PROTOCOL_VERSION",
+    "SpawnFailure",
+    "StdioClient",
+    "StdioMcpClient",
+    "StdioProcess",
+    "StdioToolCaller",
+    "StdioUpstreamConfig",
+    "StdioUpstreamPool",
+    "StdioUpstreamSession",
+    "UpstreamCallError",
+    "UpstreamError",
+    "UpstreamProtocolError",
+    "UpstreamSpawnError",
+    "UpstreamUnavailableError",
+]
