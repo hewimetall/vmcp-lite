@@ -1,0 +1,17 @@
+upstreams:
+  - name: catalog
+    description: Read-only toy catalogue data
+    command: python3
+    args:
+      - servers/catalog_server.py
+    cwd: "."
+    sidecar_spec: catalog.json
+    enabled: true
+  - name: notes
+    description: Mutable in-memory notes
+    command: python3
+    args:
+      - servers/notes_server.py
+    cwd: "."
+    sidecar_spec: notes.json
+    enabled: true

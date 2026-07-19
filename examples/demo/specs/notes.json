@@ -1,0 +1,21 @@
+{
+  "server": "notes",
+  "tools": [
+    {
+      "name": "remember_note",
+      "description": "Append a note to the demo server's in-memory list.",
+      "read_only": false,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Note text to keep for this server process."
+          }
+        },
+        "required": ["text"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "upstreams": [
+    {
+      "name": "ok",
+      "command": "python3",
+      "sidecar_spec": "ok.json"
+    },
+    {
+      "name": "remote",
+      "transport": "http",
+      "url": "https://example.invalid/mcp",
+      "sidecar_spec": "remote.json"
+    },
+    {
+      "name": "missing-command",
+      "sidecar_spec": "missing-command.json"
+    },
+    "not an object",
+    {
+      "name": "bad-sidecar",
+      "command": "python3",
+      "sidecar_spec": "bad-sidecar.json"
+    },
+    {
+      "name": "missing-sidecar",
+      "command": "python3",
+      "sidecar_spec": "does-not-exist.json"
+    },
+    {
+      "name": "disabled-http",
+      "transport": "http",
+      "url": "https://example.invalid/mcp",
+      "enabled": false
+    }
+  ]
+}

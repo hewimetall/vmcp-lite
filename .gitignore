@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Rust / maturin
+target/
+*.so
+*.pyd
+*.dylib
+
+# Tooling and local state
+.env
+.env.*
+.idea/
+.vscode/
+.DS_Store

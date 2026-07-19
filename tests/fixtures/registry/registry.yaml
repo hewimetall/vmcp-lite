@@ -1,0 +1,16 @@
+upstreams:
+  - name: alpha
+    description: Alpha demo tools
+    command: python3
+    args:
+      - -m
+      - alpha_server
+    env:
+      ALPHA_MODE: test
+    cwd: "."
+    sidecar_spec: alpha.json
+    enabled: true
+  - name: disabled-bad-http
+    transport: http
+    url: "https://example.invalid/mcp"
+    enabled: false

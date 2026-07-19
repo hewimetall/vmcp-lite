@@ -1,0 +1,21 @@
+{
+  "server": "catalog",
+  "tools": [
+    {
+      "name": "lookup_color",
+      "description": "Return the demo catalogue color for an animal.",
+      "read_only": true,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "animal": {
+            "type": "string",
+            "description": "Animal key to look up, such as fox or whale."
+          }
+        },
+        "required": ["animal"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}
